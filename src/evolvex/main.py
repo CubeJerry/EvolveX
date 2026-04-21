@@ -19,7 +19,7 @@ def main():
     evolvex_working_dir = GLOBALS.working_dir / 'EvolveX'; evolvex_working_dir.mkdir(exist_ok = True) ### Should be false
 
     backbone_PDB_files_paths = list(GLOBALS.Backbones_dir.glob('*.pdb'))
-    all_PDBs_positions_to_explore_df = pd.read_csv(GLOBALS.PositionsToExplore_file_path, header=0, sep='\t')
+    all_PDBs_positions_to_explore_df = pd.read_csv(GLOBALS.PositionsToExplore_file_path, header=0, sep='\t', dtype={'Pdb': str})
     
     parallel_executor = setup_dask_parallel_executor(GLOBALS)
     
