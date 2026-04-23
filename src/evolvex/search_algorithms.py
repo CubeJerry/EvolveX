@@ -188,17 +188,9 @@ def keep_mutant_decision(model_dir, antibody_chains, antigen_chains, antibody_st
     wildtype_other_info_map = get_all_other_interaction_file_info(interaction_file_path = model_dir / f'Interaction_WT_model_1_AC.fxout')
     mutant_other_info_map = get_all_other_interaction_file_info(interaction_file_path = model_dir / f'Interaction_model_1_AC.fxout')
 
-    
-    # Make decision
-    if antibody_stability_ddG > 1 or mutant_antibody_stability_dG > (antibody_stability_dG_original_wildtype + 4):
-        keep_mutant =  False
-    
-    elif antibody_delta_intraclash_score > 2:
-        keep_mutant =  False
-    
-    else:
-        energies = (binding_ddG, binding_ddG_with_waters) if GLOBALS.calculate_binding_dG_with_water else (binding_ddG,)
-        keep_mutant = metropolis_criterion(energies)
+
+    energies = (binding_ddG, binding_ddG_with_waters) if GLOBALS.calculate_binding_dG_with_water else (binding_ddG,)
+    keep_mutant = metropolis_criterion(energies)
 
     # Log info of the selected model. This bit of code is uggly, but couldn't find a better way.
     generated_models_info['antibody_stability_dG'].append(mutant_antibody_stability_dG if keep_mutant else wildtype_antibody_stability_dG)
