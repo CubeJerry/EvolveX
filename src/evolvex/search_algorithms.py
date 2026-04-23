@@ -190,10 +190,10 @@ def keep_mutant_decision(model_dir, antibody_chains, antigen_chains, antibody_st
 
     
     # Make decision
-    if antibody_stability_ddG > 0.5 or mutant_antibody_stability_dG > (antibody_stability_dG_original_wildtype + 2):
+    if antibody_stability_ddG > 1 or mutant_antibody_stability_dG > (antibody_stability_dG_original_wildtype + 4):
         keep_mutant =  False
     
-    elif antibody_delta_intraclash_score > 0.5 or mutant_antibody_intraclash_score > 10:
+    elif antibody_delta_intraclash_score > 2
         keep_mutant =  False
     
     else:
