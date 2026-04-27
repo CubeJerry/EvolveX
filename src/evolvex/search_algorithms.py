@@ -253,8 +253,8 @@ def keep_mutant_decision(
 
     # Relative filters: compare proposed mutant to the current parent model,
     # not to an absolute ideal threshold.
-    max_step_stability_worsening = 4.0
-    max_step_intraclash_worsening = 5.0
+    max_step_stability_worsening = 5.0
+    max_step_intraclash_worsening = 4.0
 
     if not filters_are_active:
         keep_mutant = metropolis_criterion(energies)
