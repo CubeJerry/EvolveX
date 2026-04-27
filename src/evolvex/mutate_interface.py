@@ -176,7 +176,8 @@ def generate_mutations_summary_file(PDB_dir, PDB_positions_to_explore_df, GLOBAL
         ).sort_index()
         summary_df['original_residue'] = full_original_residue_ID[0]
         summary_df['position'] = full_original_residue_ID[2:]
-
+        summary_df['MakeAla'] = row.MakeAla
+        
         all_mutations_summary_df.append(summary_df)
 
     if len(all_mutations_summary_df) == 0:
