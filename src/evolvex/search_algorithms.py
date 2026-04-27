@@ -248,7 +248,7 @@ def keep_mutant_decision(
     )
 
 
-    structural_filter_warmup_iterations = GLOBALS.recombine_every_nth_iteration
+    structural_filter_warmup_iterations = 1
     filters_are_active = nth_iteration > structural_filter_warmup_iterations
 
     # Relative filters: compare proposed mutant to the current parent model,
