@@ -89,31 +89,53 @@ def get_hotspot_positions_mut_names_map(all_mutations_summary_df):
 
 def get_allowed_mutations_per_position_maps(PDB_name, all_mutations_summary_file_path):
     """
-    Returns two dictionaries:
-    1) A dict where keys are positions and values are mutation names (i.e {'53':['A53R', 'A53K', ...]})
-    2) A dict where values are amino acid mutations (i.e {'53':['R', 'K', ...]}) 
+    Returns three objects:
+    1) A dict where keys are positions and values are mutation names
+       e.g. {'53': ['A53R', 'A53K', ...]}
+    2) A dict where keys are positions and values are allowed amino acids
+       e.g. {'53': {'R', 'K', ...}}
+    3) A set of positions that were explicitly marked MakeAla='Y'
     """
-    all_mutations_summary_df = pd.read_csv(all_mutations_summary_file_path, header=0, index_col=0, dtype = {'position':str})
+    all_mutations_summary_df = pd.read_csv(
+        all_mutations_summary_file_path,
+        header=0,
+        index_col=0,
+        dtype={'position': str},
+    )
 
-    acceptable_positions_mut_names_map = get_acceptable_positions_mut_names_map(all_mutations_summary_df, PDB_name)
-    hotspot_positions_mut_names_map = get_hotspot_positions_mut_names_map(all_mutations_summary_df)
+    acceptable_positions_mut_names_map = get_acceptable_positions_mut_names_map(
+        all_mutations_summary_df,
+        PDB_name,
+    )
+    hotspot_positions_mut_names_map = get_hotspot_positions_mut_names_map(
+        all_mutations_summary_df,
+    )
 
     allowed_mut_names_per_position_map = {}
     allowed_AA_per_position_map = {}
+    make_ala_positions = set()
+
     for position, position_df in all_mutations_summary_df.groupby('position'):
-        # In positions with an antibody folding hotspot mutation, only consider hotspot mutations, otherwise allow both hotspot and acceptable mutations.
+        if 'MakeAla' in position_df.columns and any(position_df['MakeAla'] == 'Y'):
+            make_ala_positions.add(position)
+
+        # In positions with an antibody folding hotspot mutation, only consider
+        # hotspot mutations. Otherwise allow both hotspot and acceptable mutations.
         if any(position_df.antibody_stability_ddG < -2):
             allowed_mut_names = hotspot_positions_mut_names_map[position]
             allowed_AA_mutations = {mut_name[-1] for mut_name in allowed_mut_names}
         else:
-            allowed_mut_names = hotspot_positions_mut_names_map[position] + acceptable_positions_mut_names_map[position]
+            allowed_mut_names = (
+                hotspot_positions_mut_names_map[position]
+                + acceptable_positions_mut_names_map[position]
+            )
             allowed_AA_mutations = {mut_name[-1] for mut_name in allowed_mut_names}
 
         if allowed_mut_names:
             allowed_mut_names_per_position_map[position] = allowed_mut_names
             allowed_AA_per_position_map[position] = allowed_AA_mutations
-        
-    return allowed_mut_names_per_position_map, allowed_AA_per_position_map 
+
+    return allowed_mut_names_per_position_map, allowed_AA_per_position_map, make_ala_positions
 
 
 def clean_up_model_dir(model_dir, PDB_file_name_to_keep_as_model):
@@ -126,26 +148,39 @@ def clean_up_model_dir(model_dir, PDB_file_name_to_keep_as_model):
         PDB_file_path_to_keep_as_model.rename(PDB_file_path_to_keep_as_model.with_name('model.pdb'))
     return
 
-def get_random_mutations_list_for_initial_population(allowed_mut_names_per_position_map):
+def get_random_mutations_list_for_initial_population(
+    allowed_mut_names_per_position_map,
+    make_ala_positions,
+):
     random_mutations_list = []
+
     for position, mut_names_list in allowed_mut_names_per_position_map.items():
-        # Skip positions where the wildtype residue is not Alanine, as this means the position was marked as MakeAla = "N"
-        if all(mut_name[0] != 'A' for mut_name in mut_names_list):
+        # Only positions explicitly marked MakeAla='Y' should be seeded into
+        # the initial random population.
+        # Do not infer this from mut_name[0] == 'A', because native alanines
+        # marked MakeAla='N' also produce mutation names beginning with A.
+        if position not in make_ala_positions:
             continue
 
         random_mut_name = random.choice(mut_names_list)
         random_mutations_list.append(random_mut_name)
-    
+
     random.shuffle(random_mutations_list)
     return random_mutations_list
 
 def generate_random_model(
-        PDB_name, foldx_Alanine_mutant_PDB_file_path, allowed_mut_names_per_position_map, allowed_AA_mutations_per_position_map,  antibody_stability_dG_original_wildtype,
-        antibody_seq_map_original_wildtype, model_dir, GLOBALS
+        PDB_name, foldx_Alanine_mutant_PDB_file_path, allowed_mut_names_per_position_map,
+        allowed_AA_mutations_per_position_map, make_ala_positions,
+        antibody_stability_dG_original_wildtype, antibody_seq_map_original_wildtype,
+        model_dir, GLOBALS
     ):
+        
     model, n_tries = None, 0
     while model == None:
-        random_mutations_list = get_random_mutations_list_for_initial_population(allowed_mut_names_per_position_map)
+        random_mutations_list = get_random_mutations_list_for_initial_population(
+            allowed_mut_names_per_position_map,
+            make_ala_positions,
+        )
 
         create_model(
             input_PDB_file_path = foldx_Alanine_mutant_PDB_file_path, 
@@ -190,8 +225,9 @@ def generate_initial_models(parallel_executor, evolvex_working_dir, backbone_PDB
             print(f'Could not find the all_mutations_summary.csv file for {PDB_name = }, this should not happen ! Skipping PDB backbone for search.', flush=True)
             continue
 
-        allowed_mut_names_per_position_map, allowed_AA_mutations_per_position_map = get_allowed_mutations_per_position_maps(
-            PDB_name = PDB_name, all_mutations_summary_file_path = all_mutations_summary_file_path
+        allowed_mut_names_per_position_map, allowed_AA_mutations_per_position_map, make_ala_positions = get_allowed_mutations_per_position_maps(
+            PDB_name=PDB_name,
+            all_mutations_summary_file_path=all_mutations_summary_file_path,
         )
 
         antibody_stability_dG_original_wildtype = get_chain_group_stability_dG(indiv_file_path = PDB_dir / 'Indiv_energies_original_wildtype_AC.fxout', chain_group_name = GLOBALS.antibody_chains)
@@ -200,8 +236,16 @@ def generate_initial_models(parallel_executor, evolvex_working_dir, backbone_PDB
         for ith_model in range(GLOBALS.population_size):
             model_dir = search_output_dir / str(ith_model); model_dir.mkdir(exist_ok=True)
             future = parallel_executor.submit(
-                generate_random_model, PDB_name, foldx_Alanine_mutant_PDB_file_path, allowed_mut_names_per_position_map, allowed_AA_mutations_per_position_map,  
-                antibody_stability_dG_original_wildtype, antibody_seq_map_original_wildtype, model_dir, GLOBALS
+                generate_random_model,
+                PDB_name,
+                foldx_Alanine_mutant_PDB_file_path,
+                allowed_mut_names_per_position_map,
+                allowed_AA_mutations_per_position_map,
+                make_ala_positions,
+                antibody_stability_dG_original_wildtype,
+                antibody_seq_map_original_wildtype,
+                model_dir,
+                GLOBALS,
             )
             futures.append(future)
 
