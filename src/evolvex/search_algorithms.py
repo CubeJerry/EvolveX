@@ -162,50 +162,143 @@ def metropolis_criterion(energies):
         
     return False
 
-def keep_mutant_decision(model_dir, antibody_chains, antigen_chains, antibody_stability_dG_original_wildtype, iteration_fraction, generated_models_info, GLOBALS):
-    # Calculate energies and scores
-    wildtype_antibody_stability_dG = get_chain_group_stability_dG(indiv_file_path = model_dir / 'Indiv_energies_WT_model_1_AC.fxout', chain_group_name = antibody_chains)
-    mutant_antibody_stability_dG = get_chain_group_stability_dG(indiv_file_path = model_dir / 'Indiv_energies_model_1_AC.fxout', chain_group_name = antibody_chains)
-    antibody_stability_ddG = round(mutant_antibody_stability_dG - wildtype_antibody_stability_dG, NDIGIS_ROUNDING)
+def keep_mutant_decision(
+    model_dir,
+    antibody_chains,
+    antigen_chains,
+    antibody_stability_dG_original_wildtype,
+    iteration_fraction,
+    nth_iteration,
+    generated_models_info,
+    GLOBALS,
+):
+    # Calculate antibody stability
+    wildtype_antibody_stability_dG = get_chain_group_stability_dG(
+        indiv_file_path=model_dir / 'Indiv_energies_WT_model_1_AC.fxout',
+        chain_group_name=antibody_chains,
+    )
+    mutant_antibody_stability_dG = get_chain_group_stability_dG(
+        indiv_file_path=model_dir / 'Indiv_energies_model_1_AC.fxout',
+        chain_group_name=antibody_chains,
+    )
+    antibody_stability_ddG = round(
+        mutant_antibody_stability_dG - wildtype_antibody_stability_dG,
+        NDIGIS_ROUNDING,
+    )
 
-    wildtype_complex_stability_dG = get_complex_stability_dG(st_file_path = model_dir / 'WT_model_1_0_ST.fxout')
-    mutant_complex_stability_dG = get_complex_stability_dG(st_file_path = model_dir / 'model_1_0_ST.fxout')
+    # Calculate complex stability
+    wildtype_complex_stability_dG = get_complex_stability_dG(
+        st_file_path=model_dir / 'WT_model_1_0_ST.fxout',
+    )
+    mutant_complex_stability_dG = get_complex_stability_dG(
+        st_file_path=model_dir / 'model_1_0_ST.fxout',
+    )
 
-    wildtype_binding_dG = get_binding_dG(interaction_file_path = model_dir / f'Interaction_WT_model_1_AC.fxout')
-    mutant_binding_dG = get_binding_dG(interaction_file_path = model_dir / f'Interaction_model_1_AC.fxout')
-    binding_ddG = round(mutant_binding_dG - wildtype_binding_dG, NDIGIS_ROUNDING)
-    
+    # Calculate binding energy
+    wildtype_binding_dG = get_binding_dG(
+        interaction_file_path=model_dir / 'Interaction_WT_model_1_AC.fxout',
+    )
+    mutant_binding_dG = get_binding_dG(
+        interaction_file_path=model_dir / 'Interaction_model_1_AC.fxout',
+    )
+    binding_ddG = round(
+        mutant_binding_dG - wildtype_binding_dG,
+        NDIGIS_ROUNDING,
+    )
+
     if GLOBALS.calculate_binding_dG_with_water:
-        wildtype_binding_dG_with_waters = get_binding_dG(interaction_file_path = model_dir / f'Interaction_wildtype_with_waters_AC.fxout')
-        mutant_binding_dG_with_waters = get_binding_dG(interaction_file_path = model_dir / f'Interaction_mutant_with_waters_AC.fxout')
-        binding_ddG_with_waters = round(mutant_binding_dG_with_waters - wildtype_binding_dG_with_waters, NDIGIS_ROUNDING)
+        wildtype_binding_dG_with_waters = get_binding_dG(
+            interaction_file_path=model_dir / 'Interaction_wildtype_with_waters_AC.fxout',
+        )
+        mutant_binding_dG_with_waters = get_binding_dG(
+            interaction_file_path=model_dir / 'Interaction_mutant_with_waters_AC.fxout',
+        )
+        binding_ddG_with_waters = round(
+            mutant_binding_dG_with_waters - wildtype_binding_dG_with_waters,
+            NDIGIS_ROUNDING,
+        )
 
-    wildtype_antibody_intraclash_score = get_chain_group_intraclash_score(interaction_file_path = model_dir / f'Interaction_WT_model_1_AC.fxout', chain_group_name = antibody_chains)
-    mutant_antibody_intraclash_score = get_chain_group_intraclash_score(interaction_file_path = model_dir / f'Interaction_model_1_AC.fxout', chain_group_name = antibody_chains)
-    antibody_delta_intraclash_score = round(mutant_antibody_intraclash_score - wildtype_antibody_intraclash_score, NDIGIS_ROUNDING)
+    # Calculate antibody intraclash
+    wildtype_antibody_intraclash_score = get_chain_group_intraclash_score(
+        interaction_file_path=model_dir / 'Interaction_WT_model_1_AC.fxout',
+        chain_group_name=antibody_chains,
+    )
+    mutant_antibody_intraclash_score = get_chain_group_intraclash_score(
+        interaction_file_path=model_dir / 'Interaction_model_1_AC.fxout',
+        chain_group_name=antibody_chains,
+    )
+    antibody_delta_intraclash_score = round(
+        mutant_antibody_intraclash_score - wildtype_antibody_intraclash_score,
+        NDIGIS_ROUNDING,
+    )
 
     # All columns from interactions file, starting from Backbone Hbond
-    wildtype_other_info_map = get_all_other_interaction_file_info(interaction_file_path = model_dir / f'Interaction_WT_model_1_AC.fxout')
-    mutant_other_info_map = get_all_other_interaction_file_info(interaction_file_path = model_dir / f'Interaction_model_1_AC.fxout')
+    wildtype_other_info_map = get_all_other_interaction_file_info(
+        interaction_file_path=model_dir / 'Interaction_WT_model_1_AC.fxout',
+    )
+    mutant_other_info_map = get_all_other_interaction_file_info(
+        interaction_file_path=model_dir / 'Interaction_model_1_AC.fxout',
+    )
 
-
-    energies = (binding_ddG, binding_ddG_with_waters) if GLOBALS.calculate_binding_dG_with_water else (binding_ddG,)
-    keep_mutant = metropolis_criterion(energies)
-
-    # Log info of the selected model. This bit of code is uggly, but couldn't find a better way.
-    generated_models_info['antibody_stability_dG'].append(mutant_antibody_stability_dG if keep_mutant else wildtype_antibody_stability_dG)
-    generated_models_info['complex_stability_dG'].append(mutant_complex_stability_dG if keep_mutant else wildtype_complex_stability_dG)
-    generated_models_info['binding_dG'].append(mutant_binding_dG if keep_mutant else wildtype_binding_dG)
-    if GLOBALS.calculate_binding_dG_with_water:
-        generated_models_info['binding_dG_with_waters'].append(mutant_binding_dG_with_waters if keep_mutant else wildtype_binding_dG_with_waters)
-    generated_models_info['antibody_intraclash_score'].append(mutant_antibody_intraclash_score if keep_mutant else wildtype_antibody_intraclash_score)
     
-    other_info_map = mutant_other_info_map if keep_mutant else wildtype_other_info_map
-    for key, value in other_info_map.items():
-        key = key.replace(' ', '_') # Backbone Hbond => Backbone_Hbond
-        generated_models_info[key].append(value)
+    energies = (
+        (binding_ddG, binding_ddG_with_waters)
+        if GLOBALS.calculate_binding_dG_with_water
+        else (binding_ddG,)
+    )
 
-    #
+
+    structural_filter_warmup_iterations = GLOBALS.recombine_every_nth_iteration
+    filters_are_active = nth_iteration > structural_filter_warmup_iterations
+
+    # Relative filters: compare proposed mutant to the current parent model,
+    # not to an absolute ideal threshold.
+    max_step_stability_worsening = 4.0
+    max_step_intraclash_worsening = 5.0
+
+    if not filters_are_active:
+        keep_mutant = metropolis_criterion(energies)
+
+    elif antibody_stability_ddG > max_step_stability_worsening:
+        keep_mutant = False
+
+    elif antibody_delta_intraclash_score > max_step_intraclash_worsening:
+        keep_mutant = False
+
+    else:
+        keep_mutant = metropolis_criterion(energies)
+
+
+    generated_models_info['antibody_stability_dG'].append(
+        mutant_antibody_stability_dG if keep_mutant else wildtype_antibody_stability_dG
+    )
+
+    generated_models_info['complex_stability_dG'].append(
+        mutant_complex_stability_dG if keep_mutant else wildtype_complex_stability_dG
+    )
+
+    generated_models_info['binding_dG'].append(
+        mutant_binding_dG if keep_mutant else wildtype_binding_dG
+    )
+
+    if GLOBALS.calculate_binding_dG_with_water:
+        generated_models_info['binding_dG_with_waters'].append(
+            mutant_binding_dG_with_waters
+            if keep_mutant
+            else wildtype_binding_dG_with_waters
+        )
+
+    generated_models_info['antibody_intraclash_score'].append(
+        mutant_antibody_intraclash_score
+        if keep_mutant
+        else wildtype_antibody_intraclash_score
+    )
+
+    other_info_map = mutant_other_info_map if keep_mutant else wildtype_other_info_map
+
+    for key, value in other_info_map.items():
+        key = key.replace(' ', '_') 
+        generated_models_info[key].append(value)
 
     return keep_mutant
 
@@ -252,7 +345,16 @@ def make_MC_steps(model, n_MC_steps, nth_loop, iteration_fraction, model_PDB_fil
             output_dir = model_dir, GLOBALS = GLOBALS
         )
 
-        keep_mutant = keep_mutant_decision(model_dir, antibody_chains, antigen_chains, antibody_stability_dG_original_wildtype, iteration_fraction, generated_models_info, GLOBALS)
+        keep_mutant = keep_mutant_decision(
+            model_dir,
+            antibody_chains,
+            antigen_chains,
+            antibody_stability_dG_original_wildtype,
+            iteration_fraction,
+            nth_iteration,
+            generated_models_info,
+            GLOBALS,
+        )
         if keep_mutant:
             clean_up_model_dir(model_dir, PDB_file_name_to_keep_as_model = 'model_1.pdb')
             update_full_residue_IDs_list(model, mut_names_list = [mut_name])
@@ -348,7 +450,16 @@ def make_recombination_step(model_1, model_2, nth_iteration, iteration_fraction,
             output_dir = model_dir, GLOBALS = GLOBALS
         )
         
-        keep_mutant = keep_mutant_decision(model_dir, antibody_chains, antigen_chains, antibody_stability_dG_original_wildtype, iteration_fraction, generated_models_info, GLOBALS)
+        keep_mutant = keep_mutant_decision(
+            model_dir,
+            antibody_chains,
+            antigen_chains,
+            antibody_stability_dG_original_wildtype,
+            iteration_fraction,
+            nth_iteration,
+            generated_models_info,
+            GLOBALS,
+        )
         if keep_mutant:
             clean_up_model_dir(model_dir, PDB_file_name_to_keep_as_model = 'model_1.pdb')
             update_full_residue_IDs_list(model, mut_names_list = mut_names)
