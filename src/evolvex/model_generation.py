@@ -171,18 +171,8 @@ def get_initial_full_residue_IDs_list(
     allowed_mut_names_per_position_map,
     random_mutations_list,
 ):
-    """
-    Build the full list of mutable residue identities for the MC search.
-
-    This list should include all allowed mutable positions, not only the
-    positions that were randomly mutated during initial population generation.
-
-    For positions seeded in the initial population, use the seeded mutant
-    residue. For all other positions, use the starting residue encoded in the
-    mutation names.
-    """
     seeded_mutation_by_position = {
-        mut_name[1:-1]: mut_name
+        mut_name[2:-1]: mut_name
         for mut_name in random_mutations_list
     }
 
