@@ -252,8 +252,8 @@ def keep_mutant_decision(
     filters_are_active = nth_iteration > structural_filter_warmup_iterations
     
     # Relative step filters: compare proposed mutant to current parent.
-    max_step_stability_worsening = 5.0
-    max_step_intraclash_worsening = 5.0
+    max_step_stability_worsening = 4.0
+    max_step_intraclash_worsening = 4.0
     
     # Absolute stability drift filter: compare proposed mutant to original WT.
     # This prevents slow upward drift in antibody stability dG over many small steps.
