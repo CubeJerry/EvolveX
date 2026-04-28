@@ -250,21 +250,31 @@ def keep_mutant_decision(
 
     structural_filter_warmup_iterations = 1
     filters_are_active = nth_iteration > structural_filter_warmup_iterations
-
-    # Relative filters: compare proposed mutant to the current parent model,
-    # not to an absolute ideal threshold.
+    
+    # Relative step filters: compare proposed mutant to current parent.
     max_step_stability_worsening = 5.0
     max_step_intraclash_worsening = 5.0
-
+    
+    # Absolute stability drift filter: compare proposed mutant to original WT.
+    # This prevents slow upward drift in antibody stability dG over many small steps.
+    max_stability_drift_multiplier = 2
+    
+    max_allowed_antibody_stability_dG = (
+        antibody_stability_dG_original_wildtype * max_stability_drift_multiplier
+    )
+    
     if not filters_are_active:
         keep_mutant = metropolis_criterion(energies)
-
+    
     elif antibody_stability_ddG > max_step_stability_worsening:
         keep_mutant = False
-
+    
     elif antibody_delta_intraclash_score > max_step_intraclash_worsening:
         keep_mutant = False
-
+    
+    elif mutant_antibody_stability_dG > max_allowed_antibody_stability_dG:
+        keep_mutant = False
+    
     else:
         keep_mutant = metropolis_criterion(energies)
 
