@@ -167,6 +167,41 @@ def get_random_mutations_list_for_initial_population(
     random.shuffle(random_mutations_list)
     return random_mutations_list
 
+def get_initial_full_residue_IDs_list(
+    allowed_mut_names_per_position_map,
+    random_mutations_list,
+):
+    """
+    Build the full list of mutable residue identities for the MC search.
+
+    This list should include all allowed mutable positions, not only the
+    positions that were randomly mutated during initial population generation.
+
+    For positions seeded in the initial population, use the seeded mutant
+    residue. For all other positions, use the starting residue encoded in the
+    mutation names.
+    """
+    seeded_mutation_by_position = {
+        mut_name[1:-1]: mut_name
+        for mut_name in random_mutations_list
+    }
+
+    full_residue_IDs_list = []
+
+    for position, mut_names_list in allowed_mut_names_per_position_map.items():
+        if position in seeded_mutation_by_position:
+            mut_name = seeded_mutation_by_position[position]
+            current_residue = mut_name[-1]
+            residue_ID = mut_name[1:-1]
+        else:
+            representative_mut_name = mut_names_list[0]
+            current_residue = representative_mut_name[0]
+            residue_ID = representative_mut_name[1:-1]
+
+        full_residue_IDs_list.append(f'{current_residue}{residue_ID}')
+
+    return full_residue_IDs_list
+
 def generate_random_model(
         PDB_name, foldx_Alanine_mutant_PDB_file_path, allowed_mut_names_per_position_map,
         allowed_AA_mutations_per_position_map, make_ala_positions,
@@ -191,14 +226,18 @@ def generate_random_model(
 
         complex_stability_ddG = get_complex_stability_ddG(model_dir / f'Dif_{PDB_name}_1_Alanine_mutant.fxout')
         if complex_stability_ddG < 0.5 or n_tries == 5:
-            full_residue_IDs_list = [f'{mut_name[-1]}{mut_name[1:-1]}' for mut_name in random_mutations_list]
+            full_residue_IDs_list = get_initial_full_residue_IDs_list(
+                allowed_mut_names_per_position_map,
+                random_mutations_list,
+            )
+        
             model = MC_Model(
-                model_dir = model_dir,
-                full_residue_IDs_list = full_residue_IDs_list,
-                backbone_PDB_file_name = PDB_name,
-                antibody_stability_dG_original_wildtype = antibody_stability_dG_original_wildtype,
-                antibody_seq_map_original_wildtype = antibody_seq_map_original_wildtype,
-                allowed_AA_mutations_per_position_map = allowed_AA_mutations_per_position_map,
+                model_dir=model_dir,
+                full_residue_IDs_list=full_residue_IDs_list,
+                backbone_PDB_file_name=PDB_name,
+                antibody_stability_dG_original_wildtype=antibody_stability_dG_original_wildtype,
+                antibody_seq_map_original_wildtype=antibody_seq_map_original_wildtype,
+                allowed_AA_mutations_per_position_map=allowed_AA_mutations_per_position_map,
             )
         else:
             shutil.rmtree(model_dir) # Empty the directory and try again with a new random list of mutations
