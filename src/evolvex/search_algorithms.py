@@ -20,6 +20,7 @@ from evolvex.utils import NDIGIS_ROUNDING
 
 paratope_AA =         [ 'A', 'C',  'D',  'E', 'F',  'G',  'H',  'I',  'K',  'L', 'M',  'N', 'P', 'Q',  'R',   'S',  'T', 'V', 'W',  'Y']
 paratope_AA_weights = [2.95, 0.1, 6.75, 2.85, 3.9, 7.75, 2.95, 2.75, 2.55, 3.55, 0.7, 7.75, 1.9, 2.2, 5.15, 13.45, 5.85, 2.5, 5.3, 19.1]
+aromatic_AA = {'F', 'H', 'W', 'Y'}
 
 
 def all_hotspot_and_acceptable_mutations_combinations_generator(all_mutations_summary_file_path):
@@ -134,19 +135,63 @@ def systematic_search(parallel_executor, backbone_PDB_files_paths, evolvex_worki
     return
 
 
+def get_position_to_AA_map_from_full_residue_IDs_list(full_residue_IDs_list):
+    return {
+        full_residue_ID[1:]: full_residue_ID[0]
+        for full_residue_ID in full_residue_IDs_list
+    }
+
+def get_current_aromatic_fraction_from_position_to_AA_map(position_to_AA_map):
+    n_aromatic_positions = sum(
+        current_AA in aromatic_AA
+        for current_AA in position_to_AA_map.values()
+    )
+    return n_aromatic_positions / len(position_to_AA_map)
+
+def get_state_dependent_proposal_weights(current_aromatic_fraction):
+    proposal_weights = list(paratope_AA_weights)
+    aromatic_weight_scale = 1.0
+    if current_aromatic_fraction > 0.20:
+        aromatic_weight_scale = 0.8
+    if current_aromatic_fraction > 0.30:
+        aromatic_weight_scale = 0.6
+    if current_aromatic_fraction > 0.40:
+        aromatic_weight_scale = 0.45
+
+    aa_to_weight_idx_map = {aa:i for i, aa in enumerate(paratope_AA)}
+    aromatic_idxs = [aa_to_weight_idx_map['F'], aa_to_weight_idx_map['H'], aa_to_weight_idx_map['W'], aa_to_weight_idx_map['Y']]
+    non_aromatic_idxs = [
+        idx
+        for idx, aa in enumerate(paratope_AA)
+        if aa not in aromatic_AA
+    ]
+    for idx in aromatic_idxs:
+        proposal_weights[idx] *= aromatic_weight_scale
+
+    weight_deficit = sum(paratope_AA_weights) - sum(proposal_weights)
+    if weight_deficit > 0:
+        non_aromatic_weight_sum = sum(proposal_weights[idx] for idx in non_aromatic_idxs)
+        for idx in non_aromatic_idxs:
+            proposal_weights[idx] += weight_deficit * (proposal_weights[idx] / non_aromatic_weight_sum)
+
+    return proposal_weights
+
 def get_random_mut_name(full_residue_IDs_list, allowed_AA_mutations_per_position_map):
     random_residue_ID = random.choice(full_residue_IDs_list)
     wildtype_AA, residue_ID, position = random_residue_ID[0], random_residue_ID[1:], random_residue_ID[2:]
 
     allowed_mutations = allowed_AA_mutations_per_position_map[position]
+    position_to_AA_map = get_position_to_AA_map_from_full_residue_IDs_list(full_residue_IDs_list)
+    current_aromatic_fraction = get_current_aromatic_fraction_from_position_to_AA_map(position_to_AA_map)
+    proposal_weights = get_state_dependent_proposal_weights(current_aromatic_fraction)
     if len(allowed_mutations) == 1:
         # Can't index a set, and there is only one mutation, so this works
         for mutant_AA in allowed_mutations:
             pass
     else:
-        mutant_AA = random.choices(paratope_AA, paratope_AA_weights)[0]
+        mutant_AA = random.choices(paratope_AA, proposal_weights)[0]
         while not mutant_AA in allowed_mutations:
-            mutant_AA = random.choices(paratope_AA, paratope_AA_weights)[0]
+            mutant_AA = random.choices(paratope_AA, proposal_weights)[0]
     
     return f'{wildtype_AA}{residue_ID}{mutant_AA}'
 
