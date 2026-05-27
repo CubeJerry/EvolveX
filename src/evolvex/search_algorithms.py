@@ -213,8 +213,8 @@ def get_mutation_fraction_from_original(
     antibody_seq_map_original_wildtype,
 ):
     proposed_AA_by_residue_ID = {
-        residue_ID: aa
-        for residue_ID, aa in get_position_to_AA_map_from_full_residue_IDs_list(full_residue_IDs_list).items()
+        full_residue_ID[1:]: full_residue_ID[0]
+        for full_residue_ID in full_residue_IDs_list
     }
     for mut_name in proposed_mut_names:
         residue_ID = mut_name[1:-1]
@@ -222,29 +222,13 @@ def get_mutation_fraction_from_original(
 
     n_mutated_positions = 0
     for residue_ID, proposed_AA in proposed_AA_by_residue_ID.items():
-        original_AA = antibody_seq_map_original_wildtype[residue_ID]
+        chain = residue_ID[0]
+        seq_idx = int(residue_ID[1:]) - 1
+        original_AA = antibody_seq_map_original_wildtype[chain][seq_idx]
         if proposed_AA != original_AA:
             n_mutated_positions += 1
 
     return n_mutated_positions / len(proposed_AA_by_residue_ID)
-
-def get_aromatic_fraction(
-    full_residue_IDs_list,
-    proposed_mut_names,
-):
-    proposed_AA_by_residue_ID = {
-        residue_ID: aa
-        for residue_ID, aa in get_position_to_AA_map_from_full_residue_IDs_list(full_residue_IDs_list).items()
-    }
-    for mut_name in proposed_mut_names:
-        residue_ID = mut_name[1:-1]
-        proposed_AA_by_residue_ID[residue_ID] = mut_name[-1]
-
-    n_aromatic_positions = sum(
-        proposed_AA in aromatic_AA
-        for proposed_AA in proposed_AA_by_residue_ID.values()
-    )
-    return n_aromatic_positions / len(proposed_AA_by_residue_ID)
 
 def keep_mutant_decision(
     model_dir,
@@ -346,10 +330,8 @@ def keep_mutant_decision(
     # This prevents slow upward drift in antibody stability dG over many small steps.
     max_stability_drift_multiplier = 1.3
     max_stability_drift_absolute = 10.0
-    mutation_fraction_soft_cap = 0.35
+    mutation_fraction_soft_cap = 0.25
     mutation_fraction_hard_cap = 0.50
-    aromatic_fraction_soft_cap = 0.20
-    aromatic_fraction_hard_cap = 0.40
     
     # Use the more permissive of relative and absolute caps so very stable binders
     # (low original dG) are not over-constrained by a tiny relative allowance.
@@ -367,14 +349,6 @@ def keep_mutant_decision(
         proposed_mut_names=[],
         antibody_seq_map_original_wildtype=antibody_seq_map_original_wildtype,
     )
-    proposed_aromatic_fraction = get_aromatic_fraction(
-        full_residue_IDs_list,
-        proposed_mut_names,
-    )
-    current_aromatic_fraction = get_aromatic_fraction(
-        full_residue_IDs_list,
-        proposed_mut_names=[],
-    )
     
     if not filters_are_active:
         keep_mutant = metropolis_criterion(energies)
@@ -390,9 +364,6 @@ def keep_mutant_decision(
 
     elif proposed_mutation_fraction_from_original > mutation_fraction_hard_cap:
         keep_mutant = False
-
-    elif proposed_aromatic_fraction > aromatic_fraction_hard_cap:
-        keep_mutant = False
     
     else:
         keep_mutant = metropolis_criterion(energies)
@@ -402,12 +373,6 @@ def keep_mutant_decision(
                 proposed_mutation_fraction_from_original - mutation_fraction_soft_cap
             ) / mutation_fraction_range
             keep_mutant = random.random() >= fraction_over_soft_cap
-        if keep_mutant and proposed_aromatic_fraction > aromatic_fraction_soft_cap:
-            aromatic_fraction_range = aromatic_fraction_hard_cap - aromatic_fraction_soft_cap
-            aromatic_fraction_over_soft_cap = (
-                proposed_aromatic_fraction - aromatic_fraction_soft_cap
-            ) / aromatic_fraction_range
-            keep_mutant = random.random() >= aromatic_fraction_over_soft_cap
 
 
     generated_models_info['antibody_stability_dG'].append(
@@ -417,11 +382,6 @@ def keep_mutant_decision(
         proposed_mutation_fraction_from_original
         if keep_mutant
         else current_mutation_fraction_from_original
-    )
-    generated_models_info['aromatic_fraction'].append(
-        proposed_aromatic_fraction
-        if keep_mutant
-        else current_aromatic_fraction
     )
 
     generated_models_info['complex_stability_dG'].append(
