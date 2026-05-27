@@ -299,6 +299,11 @@ def keep_mutant_decision(
         proposed_mut_names,
         antibody_seq_map_original_wildtype,
     )
+    current_mutation_fraction_from_original = get_mutation_fraction_from_original(
+        full_residue_IDs_list,
+        proposed_mut_names=[],
+        antibody_seq_map_original_wildtype=antibody_seq_map_original_wildtype,
+    )
     
     if not filters_are_active:
         keep_mutant = metropolis_criterion(energies)
@@ -330,6 +335,8 @@ def keep_mutant_decision(
     )
     generated_models_info['mutation_fraction_from_original'].append(
         proposed_mutation_fraction_from_original
+        if keep_mutant
+        else current_mutation_fraction_from_original
     )
 
     generated_models_info['complex_stability_dG'].append(
