@@ -222,9 +222,7 @@ def get_mutation_fraction_from_original(
 
     n_mutated_positions = 0
     for residue_ID, proposed_AA in proposed_AA_by_residue_ID.items():
-        chain = residue_ID[0]
-        seq_idx = int(residue_ID[1:]) - 1
-        original_AA = antibody_seq_map_original_wildtype[chain][seq_idx]
+        original_AA = antibody_seq_map_original_wildtype[residue_ID]
         if proposed_AA != original_AA:
             n_mutated_positions += 1
 
