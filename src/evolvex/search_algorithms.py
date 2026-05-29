@@ -20,7 +20,7 @@ from evolvex.utils import NDIGIS_ROUNDING
 
 paratope_AA =         [ 'A', 'C',  'D',  'E', 'F',  'G',  'H',  'I',  'K',  'L', 'M',  'N', 'P', 'Q',  'R',   'S',  'T', 'V', 'W',  'Y']
 paratope_AA_weights = [2.95, 0.1, 6.75, 2.85, 3.9, 7.75, 2.95, 2.75, 2.55, 3.55, 0.7, 7.75, 1.9, 2.2, 5.15, 13.45, 5.85, 2.5, 5.3, 19.1]
-aromatic_AA = {'F', 'H', 'W', 'Y'}
+proposal_penalty_AA = {'F', 'H', 'I', 'R', 'W', 'Y'}
 
 
 def all_hotspot_and_acceptable_mutations_combinations_generator(all_mutations_summary_file_path):
@@ -141,38 +141,41 @@ def get_position_to_AA_map_from_full_residue_IDs_list(full_residue_IDs_list):
         for full_residue_ID in full_residue_IDs_list
     }
 
-def get_current_aromatic_fraction_from_position_to_AA_map(position_to_AA_map):
-    n_aromatic_positions = sum(
-        current_AA in aromatic_AA
+def get_current_proposal_penalty_fraction_from_position_to_AA_map(position_to_AA_map):
+    n_penalized_positions = sum(
+        current_AA in proposal_penalty_AA
         for current_AA in position_to_AA_map.values()
     )
-    return n_aromatic_positions / len(position_to_AA_map)
+    return n_penalized_positions / len(position_to_AA_map)
 
-def get_state_dependent_proposal_weights(current_aromatic_fraction):
+def get_state_dependent_proposal_weights(current_penalty_fraction):
     proposal_weights = list(paratope_AA_weights)
-    aromatic_weight_scale = 1.0
-    if current_aromatic_fraction > 0.20:
-        aromatic_weight_scale = 0.7
-    if current_aromatic_fraction > 0.30:
-        aromatic_weight_scale = 0.5
-    if current_aromatic_fraction > 0.40:
-        aromatic_weight_scale = 0.3
+    penalty_weight_scale = 1.0
+    if current_penalty_fraction > 0.20:
+        penalty_weight_scale = 0.7
+    if current_penalty_fraction > 0.30:
+        penalty_weight_scale = 0.5
+    if current_penalty_fraction > 0.40:
+        penalty_weight_scale = 0.3
 
     aa_to_weight_idx_map = {aa:i for i, aa in enumerate(paratope_AA)}
-    aromatic_idxs = [aa_to_weight_idx_map['F'], aa_to_weight_idx_map['H'], aa_to_weight_idx_map['W'], aa_to_weight_idx_map['Y']]
-    non_aromatic_idxs = [
+    penalty_idxs = [
+        aa_to_weight_idx_map[aa]
+        for aa in proposal_penalty_AA
+    ]
+    non_penalty_idxs = [
         idx
         for idx, aa in enumerate(paratope_AA)
-        if aa not in aromatic_AA
+        if aa not in proposal_penalty_AA
     ]
-    for idx in aromatic_idxs:
-        proposal_weights[idx] *= aromatic_weight_scale
+    for idx in penalty_idxs:
+        proposal_weights[idx] *= penalty_weight_scale
 
     weight_deficit = sum(paratope_AA_weights) - sum(proposal_weights)
     if weight_deficit > 0:
-        non_aromatic_weight_sum = sum(proposal_weights[idx] for idx in non_aromatic_idxs)
-        for idx in non_aromatic_idxs:
-            proposal_weights[idx] += weight_deficit * (proposal_weights[idx] / non_aromatic_weight_sum)
+        non_penalty_weight_sum = sum(proposal_weights[idx] for idx in non_penalty_idxs)
+        for idx in non_penalty_idxs:
+            proposal_weights[idx] += weight_deficit * (proposal_weights[idx] / non_penalty_weight_sum)
 
     return proposal_weights
 
@@ -182,8 +185,8 @@ def get_random_mut_name(full_residue_IDs_list, allowed_AA_mutations_per_position
 
     allowed_mutations = allowed_AA_mutations_per_position_map[position]
     position_to_AA_map = get_position_to_AA_map_from_full_residue_IDs_list(full_residue_IDs_list)
-    current_aromatic_fraction = get_current_aromatic_fraction_from_position_to_AA_map(position_to_AA_map)
-    proposal_weights = get_state_dependent_proposal_weights(current_aromatic_fraction)
+    current_penalty_fraction = get_current_proposal_penalty_fraction_from_position_to_AA_map(position_to_AA_map)
+    proposal_weights = get_state_dependent_proposal_weights(current_penalty_fraction)
     if len(allowed_mutations) == 1:
         # Can't index a set, and there is only one mutation, so this works
         for mutant_AA in allowed_mutations:
@@ -206,6 +209,52 @@ def metropolis_criterion(energies):
             return True
         
     return False
+
+
+def get_binding_objective_delta(energies):
+    """Return the binding objective delta used by the rewarded objective.
+
+    Negative FoldX binding ddG values are improvements.  When the optional
+    water-aware binding calculation is enabled, all available binding terms are
+    averaged so the acceptance rule still tracks the overall binding signal.
+    """
+    return sum(energies) / len(energies)
+
+
+def get_rewarded_objective_delta(
+    binding_objective_delta,
+    antibody_stability_ddG,
+    current_mutation_fraction_from_original,
+    proposed_mutation_fraction_from_original,
+    n_mutable_positions,
+):
+    """Combine binding, stability, and mutation-count pressure into one delta.
+
+    Lower is better.  FoldX binding remains the primary term, but stability
+    improvements and mutation-count recovery can offset modest binding losses
+    through the same Metropolis criterion instead of being blocked by a hard
+    binding-improvement gate.  Negative antibody stability ddG means the
+    antibody became more stable, and a negative mutation-count delta means the
+    sequence moved back toward the original wildtype sequence.
+
+    Mutation pressure is scored in mutation-count units instead of raw fraction
+    units.  MC usually changes one position at a time, so a raw fraction delta
+    can be tiny when many positions are mutable; rescaling by the mutable
+    position count makes one recovered mutation carry a consistent reward.
+    """
+    stability_weight = 0.25
+    mutation_count_weight = 0.5
+
+    mutation_count_delta = (
+        proposed_mutation_fraction_from_original
+        - current_mutation_fraction_from_original
+    ) * n_mutable_positions
+
+    return (
+        binding_objective_delta
+        + stability_weight * antibody_stability_ddG
+        + mutation_count_weight * mutation_count_delta
+    )
 
 def get_original_residue_AA(antibody_seq_map_original_wildtype, residue_ID):
     """Return the original wildtype amino acid for a FoldX residue ID.
@@ -352,7 +401,7 @@ def keep_mutant_decision(
     )
 
 
-    structural_filter_warmup_iterations = 1
+    structural_filter_warmup_iterations = 0
     filters_are_active = nth_iteration > structural_filter_warmup_iterations
     
     # Relative step filters: compare proposed mutant to current parent.
@@ -382,9 +431,21 @@ def keep_mutant_decision(
         proposed_mut_names=[],
         antibody_seq_map_original_wildtype=antibody_seq_map_original_wildtype,
     )
-    
+    proposed_binding_objective_delta = get_binding_objective_delta(energies)
+    proposed_mutation_count_delta_from_original = (
+        proposed_mutation_fraction_from_original
+        - current_mutation_fraction_from_original
+    ) * len(full_residue_IDs_list)
+    proposed_rewarded_objective_delta = get_rewarded_objective_delta(
+        proposed_binding_objective_delta,
+        antibody_stability_ddG,
+        current_mutation_fraction_from_original,
+        proposed_mutation_fraction_from_original,
+        len(full_residue_IDs_list),
+    )
+
     if not filters_are_active:
-        keep_mutant = metropolis_criterion(energies)
+        keep_mutant = metropolis_criterion((proposed_rewarded_objective_delta,))
     
     elif antibody_stability_ddG > max_step_stability_worsening:
         keep_mutant = False
@@ -399,14 +460,51 @@ def keep_mutant_decision(
         keep_mutant = False
     
     else:
-        keep_mutant = metropolis_criterion(energies)
-        if keep_mutant and proposed_mutation_fraction_from_original > mutation_fraction_soft_cap:
+        keep_mutant = metropolis_criterion((proposed_rewarded_objective_delta,))
+        mutation_fraction_increased = (
+            proposed_mutation_fraction_from_original
+            > current_mutation_fraction_from_original
+        )
+        if (
+            keep_mutant
+            and mutation_fraction_increased
+            and proposed_mutation_fraction_from_original > mutation_fraction_soft_cap
+        ):
             mutation_fraction_range = mutation_fraction_hard_cap - mutation_fraction_soft_cap
             fraction_over_soft_cap = (
                 proposed_mutation_fraction_from_original - mutation_fraction_soft_cap
             ) / mutation_fraction_range
             keep_mutant = random.random() >= fraction_over_soft_cap
 
+
+    retained_binding_objective_delta = (
+        proposed_binding_objective_delta if keep_mutant else 0.0
+    )
+    retained_mutation_count_delta_from_original = (
+        proposed_mutation_count_delta_from_original if keep_mutant else 0.0
+    )
+    retained_rewarded_objective_delta = (
+        proposed_rewarded_objective_delta if keep_mutant else 0.0
+    )
+
+    generated_models_info['binding_objective_delta'].append(
+        retained_binding_objective_delta
+    )
+    generated_models_info['mutation_count_delta_from_original'].append(
+        retained_mutation_count_delta_from_original
+    )
+    generated_models_info['rewarded_objective_delta'].append(
+        retained_rewarded_objective_delta
+    )
+    generated_models_info['proposed_binding_objective_delta'].append(
+        proposed_binding_objective_delta
+    )
+    generated_models_info['proposed_mutation_count_delta_from_original'].append(
+        proposed_mutation_count_delta_from_original
+    )
+    generated_models_info['proposed_rewarded_objective_delta'].append(
+        proposed_rewarded_objective_delta
+    )
 
     generated_models_info['antibody_stability_dG'].append(
         mutant_antibody_stability_dG if keep_mutant else wildtype_antibody_stability_dG
