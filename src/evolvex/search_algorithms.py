@@ -207,6 +207,38 @@ def metropolis_criterion(energies):
         
     return False
 
+def get_original_residue_AA(antibody_seq_map_original_wildtype, residue_ID):
+    """Return the original wildtype amino acid for a FoldX residue ID.
+
+    ``generate_initial_models`` stores ``antibody_seq_map_original_wildtype`` as a
+    residue-ID keyed mapping (for example ``{"B52": "Y"}``).  Older or
+    caller-provided maps may instead be keyed by chain with sequence strings or
+    lists (for example ``{"B": "...Y..."}``), so keep that format working
+    as a fallback.
+    """
+    if residue_ID in antibody_seq_map_original_wildtype:
+        return antibody_seq_map_original_wildtype[residue_ID]
+
+    chain = residue_ID[0]
+    residue_number = int(residue_ID[1:])
+    chain_sequence = antibody_seq_map_original_wildtype.get(chain)
+    if chain_sequence is not None:
+        seq_idx = residue_number - 1
+        if 0 <= seq_idx < len(chain_sequence):
+            return chain_sequence[seq_idx]
+
+    available_residue_IDs = sorted(
+        residue_id
+        for residue_id in antibody_seq_map_original_wildtype
+        if len(residue_id) > 1 and residue_id[0] == chain
+    )
+    raise KeyError(
+        f"Could not find original wildtype residue {residue_ID!r} in "
+        "antibody_seq_map_original_wildtype. Available residue IDs for "
+        f"chain {chain!r}: {available_residue_IDs}"
+    )
+
+
 def get_mutation_fraction_from_original(
     full_residue_IDs_list,
     proposed_mut_names,
@@ -222,9 +254,10 @@ def get_mutation_fraction_from_original(
 
     n_mutated_positions = 0
     for residue_ID, proposed_AA in proposed_AA_by_residue_ID.items():
-        chain = residue_ID[0]
-        seq_idx = int(residue_ID[1:]) - 1
-        original_AA = antibody_seq_map_original_wildtype[chain][seq_idx]
+        original_AA = get_original_residue_AA(
+            antibody_seq_map_original_wildtype,
+            residue_ID,
+        )
         if proposed_AA != original_AA:
             n_mutated_positions += 1
 
