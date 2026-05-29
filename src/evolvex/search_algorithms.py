@@ -152,11 +152,11 @@ def get_state_dependent_proposal_weights(current_aromatic_fraction):
     proposal_weights = list(paratope_AA_weights)
     aromatic_weight_scale = 1.0
     if current_aromatic_fraction > 0.20:
-        aromatic_weight_scale = 0.8
+        aromatic_weight_scale = 0.7
     if current_aromatic_fraction > 0.30:
-        aromatic_weight_scale = 0.6
+        aromatic_weight_scale = 0.5
     if current_aromatic_fraction > 0.40:
-        aromatic_weight_scale = 0.45
+        aromatic_weight_scale = 0.3
 
     aa_to_weight_idx_map = {aa:i for i, aa in enumerate(paratope_AA)}
     aromatic_idxs = [aa_to_weight_idx_map['F'], aa_to_weight_idx_map['H'], aa_to_weight_idx_map['W'], aa_to_weight_idx_map['Y']]
