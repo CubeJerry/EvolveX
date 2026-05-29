@@ -401,7 +401,7 @@ def keep_mutant_decision(
     )
 
 
-    structural_filter_warmup_iterations = 1
+    structural_filter_warmup_iterations = 0
     filters_are_active = nth_iteration > structural_filter_warmup_iterations
     
     # Relative step filters: compare proposed mutant to current parent.
