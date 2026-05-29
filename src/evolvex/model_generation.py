@@ -283,12 +283,11 @@ def generate_initial_models(parallel_executor, evolvex_working_dir, backbone_PDB
         )
 
         antibody_stability_dG_original_wildtype = get_chain_group_stability_dG(indiv_file_path = PDB_dir / 'Indiv_energies_original_wildtype_AC.fxout', chain_group_name = GLOBALS.antibody_chains)
-        antibody_seq_map_original_wildtype = get_residue_ID_to_residue_name_map(PDB_file_path)
-        validate_original_wildtype_residue_map(
-            PDB_name,
-            antibody_seq_map_original_wildtype,
-            allowed_mut_names_per_position_map,
-        )
+        antibody_seq_map_original_wildtype = {
+            residue_ID:residue_name
+            for residue_ID, residue_name in get_residue_ID_to_residue_name_map(PDB_file_path).items()
+            if residue_ID[0] in GLOBALS.antibody_chains
+        }
 
         for ith_model in range(GLOBALS.population_size):
             model_dir = search_output_dir / str(ith_model); model_dir.mkdir(exist_ok=True)
