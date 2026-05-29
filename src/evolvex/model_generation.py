@@ -137,6 +137,30 @@ def get_allowed_mutations_per_position_maps(PDB_name, all_mutations_summary_file
     return allowed_mut_names_per_position_map, allowed_AA_per_position_map, make_ala_positions
 
 
+
+def validate_original_wildtype_residue_map(
+    PDB_name,
+    original_wildtype_residue_map,
+    allowed_mut_names_per_position_map,
+):
+    mutable_residue_IDs = {
+        mut_name[1:-1]
+        for mut_names in allowed_mut_names_per_position_map.values()
+        for mut_name in mut_names
+    }
+    missing_residue_IDs = sorted(
+        mutable_residue_IDs
+        - set(original_wildtype_residue_map)
+    )
+    if missing_residue_IDs:
+        raise ValueError(
+            f'Could not find original wildtype residues for mutable positions '
+            f'{missing_residue_IDs} in {PDB_name = }. Check that PositionsToExplore '
+            'uses chain IDs and residue numbers present in the original backbone PDB.'
+        )
+
+    return
+
 def clean_up_model_dir(model_dir, PDB_file_name_to_keep_as_model):
     for file in model_dir.iterdir():
         if file.name != PDB_file_name_to_keep_as_model:
