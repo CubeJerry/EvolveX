@@ -207,6 +207,45 @@ def metropolis_criterion(energies):
         
     return False
 
+
+def get_binding_objective_delta(energies):
+    """Return the binding objective delta used as the primary FoldX gate.
+
+    Negative FoldX binding ddG values are improvements.  When the optional
+    water-aware binding calculation is enabled, all available binding terms are
+    averaged so the acceptance rule still tracks the overall binding signal.
+    """
+    return sum(energies) / len(energies)
+
+
+def get_rewarded_objective_delta(
+    binding_objective_delta,
+    antibody_stability_ddG,
+    current_mutation_fraction_from_original,
+    proposed_mutation_fraction_from_original,
+):
+    """Combine binding, stability, and mutation-count pressure into one delta.
+
+    Lower is better.  Binding remains the dominant term and is separately gated
+    by the caller so a stability or mutation-fraction reward cannot rescue a
+    proposal that does not improve FoldX binding.  Negative antibody stability
+    ddG means the antibody became more stable, and a negative mutation-fraction
+    delta means the sequence moved back toward the original wildtype sequence.
+    """
+    stability_weight = 0.25
+    mutation_fraction_weight = 2.0
+
+    mutation_fraction_delta = (
+        proposed_mutation_fraction_from_original
+        - current_mutation_fraction_from_original
+    )
+
+    return (
+        binding_objective_delta
+        + stability_weight * antibody_stability_ddG
+        + mutation_fraction_weight * mutation_fraction_delta
+    )
+
 def get_original_residue_AA(antibody_seq_map_original_wildtype, residue_ID):
     """Return the original wildtype amino acid for a FoldX residue ID.
 
@@ -382,9 +421,20 @@ def keep_mutant_decision(
         proposed_mut_names=[],
         antibody_seq_map_original_wildtype=antibody_seq_map_original_wildtype,
     )
-    
-    if not filters_are_active:
-        keep_mutant = metropolis_criterion(energies)
+    binding_objective_delta = get_binding_objective_delta(energies)
+    rewarded_objective_delta = get_rewarded_objective_delta(
+        binding_objective_delta,
+        antibody_stability_ddG,
+        current_mutation_fraction_from_original,
+        proposed_mutation_fraction_from_original,
+    )
+    binding_improves = binding_objective_delta < 0
+
+    if not binding_improves:
+        keep_mutant = False
+
+    elif not filters_are_active:
+        keep_mutant = metropolis_criterion((rewarded_objective_delta,))
     
     elif antibody_stability_ddG > max_step_stability_worsening:
         keep_mutant = False
@@ -399,14 +449,25 @@ def keep_mutant_decision(
         keep_mutant = False
     
     else:
-        keep_mutant = metropolis_criterion(energies)
-        if keep_mutant and proposed_mutation_fraction_from_original > mutation_fraction_soft_cap:
+        keep_mutant = metropolis_criterion((rewarded_objective_delta,))
+        mutation_fraction_increased = (
+            proposed_mutation_fraction_from_original
+            > current_mutation_fraction_from_original
+        )
+        if (
+            keep_mutant
+            and mutation_fraction_increased
+            and proposed_mutation_fraction_from_original > mutation_fraction_soft_cap
+        ):
             mutation_fraction_range = mutation_fraction_hard_cap - mutation_fraction_soft_cap
             fraction_over_soft_cap = (
                 proposed_mutation_fraction_from_original - mutation_fraction_soft_cap
             ) / mutation_fraction_range
             keep_mutant = random.random() >= fraction_over_soft_cap
 
+
+    generated_models_info['binding_objective_delta'].append(binding_objective_delta)
+    generated_models_info['rewarded_objective_delta'].append(rewarded_objective_delta)
 
     generated_models_info['antibody_stability_dG'].append(
         mutant_antibody_stability_dG if keep_mutant else wildtype_antibody_stability_dG
