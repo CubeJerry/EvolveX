@@ -143,8 +143,13 @@ def validate_original_wildtype_residue_map(
     original_wildtype_residue_map,
     allowed_mut_names_per_position_map,
 ):
+    mutable_residue_IDs = {
+        mut_name[1:-1]
+        for mut_names in allowed_mut_names_per_position_map.values()
+        for mut_name in mut_names
+    }
     missing_residue_IDs = sorted(
-        set(allowed_mut_names_per_position_map)
+        mutable_residue_IDs
         - set(original_wildtype_residue_map)
     )
     if missing_residue_IDs:
