@@ -209,7 +209,7 @@ def metropolis_criterion(energies):
 
 
 def get_binding_objective_delta(energies):
-    """Return the binding objective delta used as the primary FoldX gate.
+    """Return the binding objective delta used by the rewarded objective.
 
     Negative FoldX binding ddG values are improvements.  When the optional
     water-aware binding calculation is enabled, all available binding terms are
@@ -226,11 +226,12 @@ def get_rewarded_objective_delta(
 ):
     """Combine binding, stability, and mutation-count pressure into one delta.
 
-    Lower is better.  Binding remains the dominant term and is separately gated
-    by the caller so a stability or mutation-fraction reward cannot rescue a
-    proposal that does not improve FoldX binding.  Negative antibody stability
-    ddG means the antibody became more stable, and a negative mutation-fraction
-    delta means the sequence moved back toward the original wildtype sequence.
+    Lower is better.  FoldX binding remains the primary term, but stability
+    improvements and mutation-fraction recovery can offset modest binding losses
+    through the same Metropolis criterion instead of being blocked by a hard
+    binding-improvement gate.  Negative antibody stability ddG means the
+    antibody became more stable, and a negative mutation-fraction delta means
+    the sequence moved back toward the original wildtype sequence.
     """
     stability_weight = 0.25
     mutation_fraction_weight = 2.0
@@ -428,12 +429,8 @@ def keep_mutant_decision(
         current_mutation_fraction_from_original,
         proposed_mutation_fraction_from_original,
     )
-    binding_improves = binding_objective_delta < 0
 
-    if not binding_improves:
-        keep_mutant = False
-
-    elif not filters_are_active:
+    if not filters_are_active:
         keep_mutant = metropolis_criterion((rewarded_objective_delta,))
     
     elif antibody_stability_ddG > max_step_stability_worsening:
