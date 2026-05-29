@@ -431,13 +431,13 @@ def keep_mutant_decision(
         proposed_mut_names=[],
         antibody_seq_map_original_wildtype=antibody_seq_map_original_wildtype,
     )
-    binding_objective_delta = get_binding_objective_delta(energies)
-    mutation_count_delta_from_original = (
+    proposed_binding_objective_delta = get_binding_objective_delta(energies)
+    proposed_mutation_count_delta_from_original = (
         proposed_mutation_fraction_from_original
         - current_mutation_fraction_from_original
     ) * len(full_residue_IDs_list)
-    rewarded_objective_delta = get_rewarded_objective_delta(
-        binding_objective_delta,
+    proposed_rewarded_objective_delta = get_rewarded_objective_delta(
+        proposed_binding_objective_delta,
         antibody_stability_ddG,
         current_mutation_fraction_from_original,
         proposed_mutation_fraction_from_original,
@@ -445,7 +445,7 @@ def keep_mutant_decision(
     )
 
     if not filters_are_active:
-        keep_mutant = metropolis_criterion((rewarded_objective_delta,))
+        keep_mutant = metropolis_criterion((proposed_rewarded_objective_delta,))
     
     elif antibody_stability_ddG > max_step_stability_worsening:
         keep_mutant = False
@@ -460,7 +460,7 @@ def keep_mutant_decision(
         keep_mutant = False
     
     else:
-        keep_mutant = metropolis_criterion((rewarded_objective_delta,))
+        keep_mutant = metropolis_criterion((proposed_rewarded_objective_delta,))
         mutation_fraction_increased = (
             proposed_mutation_fraction_from_original
             > current_mutation_fraction_from_original
@@ -477,11 +477,34 @@ def keep_mutant_decision(
             keep_mutant = random.random() >= fraction_over_soft_cap
 
 
-    generated_models_info['binding_objective_delta'].append(binding_objective_delta)
-    generated_models_info['mutation_count_delta_from_original'].append(
-        mutation_count_delta_from_original
+    retained_binding_objective_delta = (
+        proposed_binding_objective_delta if keep_mutant else 0.0
     )
-    generated_models_info['rewarded_objective_delta'].append(rewarded_objective_delta)
+    retained_mutation_count_delta_from_original = (
+        proposed_mutation_count_delta_from_original if keep_mutant else 0.0
+    )
+    retained_rewarded_objective_delta = (
+        proposed_rewarded_objective_delta if keep_mutant else 0.0
+    )
+
+    generated_models_info['binding_objective_delta'].append(
+        retained_binding_objective_delta
+    )
+    generated_models_info['mutation_count_delta_from_original'].append(
+        retained_mutation_count_delta_from_original
+    )
+    generated_models_info['rewarded_objective_delta'].append(
+        retained_rewarded_objective_delta
+    )
+    generated_models_info['proposed_binding_objective_delta'].append(
+        proposed_binding_objective_delta
+    )
+    generated_models_info['proposed_mutation_count_delta_from_original'].append(
+        proposed_mutation_count_delta_from_original
+    )
+    generated_models_info['proposed_rewarded_objective_delta'].append(
+        proposed_rewarded_objective_delta
+    )
 
     generated_models_info['antibody_stability_dG'].append(
         mutant_antibody_stability_dG if keep_mutant else wildtype_antibody_stability_dG
