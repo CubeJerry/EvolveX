@@ -223,28 +223,34 @@ def get_rewarded_objective_delta(
     antibody_stability_ddG,
     current_mutation_fraction_from_original,
     proposed_mutation_fraction_from_original,
+    n_mutable_positions,
 ):
     """Combine binding, stability, and mutation-count pressure into one delta.
 
     Lower is better.  FoldX binding remains the primary term, but stability
-    improvements and mutation-fraction recovery can offset modest binding losses
+    improvements and mutation-count recovery can offset modest binding losses
     through the same Metropolis criterion instead of being blocked by a hard
     binding-improvement gate.  Negative antibody stability ddG means the
-    antibody became more stable, and a negative mutation-fraction delta means
-    the sequence moved back toward the original wildtype sequence.
+    antibody became more stable, and a negative mutation-count delta means the
+    sequence moved back toward the original wildtype sequence.
+
+    Mutation pressure is scored in mutation-count units instead of raw fraction
+    units.  MC usually changes one position at a time, so a raw fraction delta
+    can be tiny when many positions are mutable; rescaling by the mutable
+    position count makes one recovered mutation carry a consistent reward.
     """
     stability_weight = 0.25
-    mutation_fraction_weight = 2.0
+    mutation_count_weight = 0.5
 
-    mutation_fraction_delta = (
+    mutation_count_delta = (
         proposed_mutation_fraction_from_original
         - current_mutation_fraction_from_original
-    )
+    ) * n_mutable_positions
 
     return (
         binding_objective_delta
         + stability_weight * antibody_stability_ddG
-        + mutation_fraction_weight * mutation_fraction_delta
+        + mutation_count_weight * mutation_count_delta
     )
 
 def get_original_residue_AA(antibody_seq_map_original_wildtype, residue_ID):
@@ -423,11 +429,16 @@ def keep_mutant_decision(
         antibody_seq_map_original_wildtype=antibody_seq_map_original_wildtype,
     )
     binding_objective_delta = get_binding_objective_delta(energies)
+    mutation_count_delta_from_original = (
+        proposed_mutation_fraction_from_original
+        - current_mutation_fraction_from_original
+    ) * len(full_residue_IDs_list)
     rewarded_objective_delta = get_rewarded_objective_delta(
         binding_objective_delta,
         antibody_stability_ddG,
         current_mutation_fraction_from_original,
         proposed_mutation_fraction_from_original,
+        len(full_residue_IDs_list),
     )
 
     if not filters_are_active:
@@ -464,6 +475,9 @@ def keep_mutant_decision(
 
 
     generated_models_info['binding_objective_delta'].append(binding_objective_delta)
+    generated_models_info['mutation_count_delta_from_original'].append(
+        mutation_count_delta_from_original
+    )
     generated_models_info['rewarded_objective_delta'].append(rewarded_objective_delta)
 
     generated_models_info['antibody_stability_dG'].append(
