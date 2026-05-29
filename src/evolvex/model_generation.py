@@ -8,7 +8,7 @@ import pandas as pd
 
 from evolvex.model_dataclasses import MC_Model
 from evolvex.foldx_commands import create_individual_list_foldx_mutations_file, run_foldx_BuildModel, get_complex_stability_ddG, get_chain_group_stability_dG
-from evolvex.utils_bio import get_chain_to_sequence_map
+from evolvex.utils_bio import get_residue_ID_to_residue_name_map
 
 large_hydrophobic_residues = 'FILWY'
 
@@ -137,6 +137,25 @@ def get_allowed_mutations_per_position_maps(PDB_name, all_mutations_summary_file
     return allowed_mut_names_per_position_map, allowed_AA_per_position_map, make_ala_positions
 
 
+
+def validate_original_wildtype_residue_map(
+    PDB_name,
+    original_wildtype_residue_map,
+    allowed_mut_names_per_position_map,
+):
+    missing_residue_IDs = sorted(
+        set(allowed_mut_names_per_position_map)
+        - set(original_wildtype_residue_map)
+    )
+    if missing_residue_IDs:
+        raise ValueError(
+            f'Could not find original wildtype residues for mutable positions '
+            f'{missing_residue_IDs} in {PDB_name = }. Check that PositionsToExplore '
+            'uses chain IDs and residue numbers present in the original backbone PDB.'
+        )
+
+    return
+
 def clean_up_model_dir(model_dir, PDB_file_name_to_keep_as_model):
     for file in model_dir.iterdir():
         if file.name != PDB_file_name_to_keep_as_model:
@@ -259,7 +278,12 @@ def generate_initial_models(parallel_executor, evolvex_working_dir, backbone_PDB
         )
 
         antibody_stability_dG_original_wildtype = get_chain_group_stability_dG(indiv_file_path = PDB_dir / 'Indiv_energies_original_wildtype_AC.fxout', chain_group_name = GLOBALS.antibody_chains)
-        antibody_seq_map_original_wildtype = get_chain_to_sequence_map(PDB_file_path = foldx_Alanine_mutant_PDB_file_path, chain_subset = GLOBALS.antibody_chains)
+        antibody_seq_map_original_wildtype = get_residue_ID_to_residue_name_map(PDB_file_path)
+        validate_original_wildtype_residue_map(
+            PDB_name,
+            antibody_seq_map_original_wildtype,
+            allowed_mut_names_per_position_map,
+        )
 
         for ith_model in range(GLOBALS.population_size):
             model_dir = search_output_dir / str(ith_model); model_dir.mkdir(exist_ok=True)
