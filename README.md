@@ -1,4 +1,4 @@
-## Original EvolveX
+## Original
 
 The original search uses a binding-centred Metropolis objective:
 
@@ -22,7 +22,7 @@ The original implementation also applies strict structural filters for antibody 
 
 ---
 
-## Forked EvolveX
+## Fork 
 
 This fork replaces the binding-only objective with a rewarded objective:
 
