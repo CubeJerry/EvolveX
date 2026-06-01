@@ -619,6 +619,66 @@ def make_MC_steps(model, n_MC_steps, nth_loop, iteration_fraction, model_PDB_fil
 
     return model, generated_models_info
 
+def make_MC_step(model, nth_iteration, iteration_fraction, model_PDB_files_dir, GLOBALS):
+    backbone_PDB_file_name = model.backbone_PDB_file_name
+    antibody_stability_dG_original_wildtype = model.antibody_stability_dG_original_wildtype
+    antibody_seq_map_original_wildtype = model.antibody_seq_map_original_wildtype
+    allowed_AA_mutations_per_position_map = model.allowed_AA_mutations_per_position_map
+    antibody_chains, antigen_chains = GLOBALS.antibody_chains, GLOBALS.antigen_chains
+
+    generated_models_info = defaultdict(list)
+    generated_models_info['backbone_PDB_file_name'] = [backbone_PDB_file_name]
+    generated_models_info['nth_model'] = [model.model_dir.name]
+    generated_models_info['step'] = ['MC']
+    generated_models_info['nth_iteration'] = [nth_iteration]
+
+    full_residue_IDs_list = model.full_residue_IDs_list
+    mut_name = get_random_mut_name(full_residue_IDs_list, allowed_AA_mutations_per_position_map)
+
+    # Create the mutant with BuildModel, which will be called "model_1"
+    model_dir = model.model_dir
+    create_model(
+        input_PDB_file_path = model_dir / 'model.pdb', copy_PDB_file_to_output_dir = False, mutations_list = [mut_name], output_dir = model_dir, GLOBALS = GLOBALS,
+    )
+
+    run_foldx_commands(
+        mutant_PDB_file_path = model_dir / 'model_1.pdb', wildtype_PDB_file_path = model_dir / 'WT_model_1.pdb',
+        antibody_chains = antibody_chains, antigen_chains = antigen_chains,
+        output_dir = model_dir, GLOBALS = GLOBALS
+    )
+
+    keep_mutant = keep_mutant_decision(
+        model_dir,
+        antibody_chains,
+        antigen_chains,
+        antibody_stability_dG_original_wildtype,
+        iteration_fraction,
+        nth_iteration,
+        generated_models_info,
+        full_residue_IDs_list,
+        [mut_name],
+        antibody_seq_map_original_wildtype,
+        GLOBALS,
+    )
+    if keep_mutant:
+        clean_up_model_dir(model_dir, PDB_file_name_to_keep_as_model = 'model_1.pdb')
+        update_full_residue_IDs_list(model, mut_names_list = [mut_name])
+
+    else:
+        clean_up_model_dir(model_dir, PDB_file_name_to_keep_as_model = 'model.pdb')
+
+    save_compressed_PDB_file(
+        PDB_file_path = model_dir / 'model.pdb',
+        output_name = f'{backbone_PDB_file_name}_{model.model_dir.name}_{nth_iteration}.pdb',
+        output_dir = model_PDB_files_dir
+    )
+
+    generated_models_info['residue_IDs'].append(';'.join(full_residue_IDs_list))
+    generated_models_info['from_mut_name'].append(mut_name)
+    generated_models_info['mutation_accepted'].append(keep_mutant)
+
+    return model, generated_models_info
+
 def write_generated_models_info(generated_models_info, generated_models_info_file_handle):
     if generated_models_info_file_handle.tell() == 0: # File is empty
         headers = ','.join(generated_models_info.keys()) + '\n'
@@ -631,6 +691,7 @@ def write_generated_models_info(generated_models_info, generated_models_info_fil
     )
     
     generated_models_info_file_handle.writelines(lines)
+    generated_models_info_file_handle.flush()
     return
 
 def random_model_pairing_generator(models_population):
@@ -735,37 +796,37 @@ def GA_search(parallel_executor, initial_models_population, generated_models_inf
     n_MC_and_recombination_loops = max_iterations // recombine_every_nth_iteration
     n_MC_steps_per_loop = recombine_every_nth_iteration - 1
 
-    generated_models_info_file_handle = open(generated_models_info_file_path, 'a')
-
     models_population = initial_models_population
-    for nth_loop in range(n_MC_and_recombination_loops):
-        iteration_fraction = nth_loop / n_MC_and_recombination_loops
+    with open(generated_models_info_file_path, 'a') as generated_models_info_file_handle:
+        for nth_loop in range(n_MC_and_recombination_loops):
+            iteration_fraction = nth_loop / n_MC_and_recombination_loops
 
-        # MC steps
-        futures = []
-        for model in models_population:
-            future = parallel_executor.submit(make_MC_steps, model, n_MC_steps_per_loop, nth_loop, iteration_fraction, model_PDB_files_dir, GLOBALS)
-            futures.append(future)
+            # MC steps. Complete and write one MC iteration for all models before starting the next.
+            for i in range(n_MC_steps_per_loop):
+                nth_iteration = nth_loop * recombine_every_nth_iteration + i + 1
+                futures = []
+                for model in models_population:
+                    future = parallel_executor.submit(make_MC_step, model, nth_iteration, iteration_fraction, model_PDB_files_dir, GLOBALS)
+                    futures.append(future)
 
-        models_population = []
-        for _, (model, generated_models_info) in as_completed(futures, with_results=True):
-            models_population.append(model)
-            write_generated_models_info(generated_models_info, generated_models_info_file_handle)
-        parallel_executor.cancel(futures)
-        
-        # Recombination step. The models are recombined with a model from the same backbone.
-        nth_iteration = (nth_loop + 1) * recombine_every_nth_iteration
-        futures = []
-        for model_1, model_2 in random_model_pairing_generator(models_population):
-            future = parallel_executor.submit(make_recombination_step, model_1, model_2, nth_iteration, iteration_fraction, model_PDB_files_dir, GLOBALS)
-            futures.append(future)
+                models_population = []
+                for _, (model, generated_models_info) in as_completed(futures, with_results=True):
+                    models_population.append(model)
+                    write_generated_models_info(generated_models_info, generated_models_info_file_handle)
+                parallel_executor.cancel(futures)
 
-        models_population = []
-        for _, (model_1, model_2, generated_models_info) in as_completed(futures, with_results=True):
-            models_population.append(model_1)
-            models_population.append(model_2)
-            write_generated_models_info(generated_models_info, generated_models_info_file_handle)
-        parallel_executor.cancel(futures)
+            # Recombination step. The models are recombined with a model from the same backbone.
+            nth_iteration = (nth_loop + 1) * recombine_every_nth_iteration
+            futures = []
+            for model_1, model_2 in random_model_pairing_generator(models_population):
+                future = parallel_executor.submit(make_recombination_step, model_1, model_2, nth_iteration, iteration_fraction, model_PDB_files_dir, GLOBALS)
+                futures.append(future)
 
-    generated_models_info_file_handle.close()
+            models_population = []
+            for _, (model_1, model_2, generated_models_info) in as_completed(futures, with_results=True):
+                models_population.append(model_1)
+                models_population.append(model_2)
+                write_generated_models_info(generated_models_info, generated_models_info_file_handle)
+            parallel_executor.cancel(futures)
+
     return
