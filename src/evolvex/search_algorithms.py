@@ -412,8 +412,8 @@ def keep_mutant_decision(
     # This prevents slow upward drift in antibody stability dG over many small steps.
     max_stability_drift_multiplier = 1.3
     max_stability_drift_absolute = 10.0
-    mutation_fraction_soft_cap = 0.25
-    mutation_fraction_hard_cap = 0.50
+    mutation_fraction_soft_cap = 0.2
+    mutation_fraction_hard_cap = 0.4
     
     # Use the more permissive of relative and absolute caps so very stable binders
     # (low original dG) are not over-constrained by a tiny relative allowance.
