@@ -151,7 +151,7 @@ def get_current_proposal_penalty_fraction_from_position_to_AA_map(position_to_AA
 def get_state_dependent_proposal_weights(current_penalty_fraction):
     proposal_weights = list(paratope_AA_weights)
     penalty_weight_scale = 1.0
-    if current_penalty_fraction > 0.20:
+    if current_penalty_fraction > 0.15:
         penalty_weight_scale = 0.7
     if current_penalty_fraction > 0.30:
         penalty_weight_scale = 0.5
@@ -412,8 +412,8 @@ def keep_mutant_decision(
     # This prevents slow upward drift in antibody stability dG over many small steps.
     max_stability_drift_multiplier = 1.3
     max_stability_drift_absolute = 10.0
-    mutation_fraction_soft_cap = 0.2
-    mutation_fraction_hard_cap = 0.4
+    mutation_fraction_soft_cap = 0.25
+    mutation_fraction_hard_cap = 0.5
     
     # Use the more permissive of relative and absolute caps so very stable binders
     # (low original dG) are not over-constrained by a tiny relative allowance.
