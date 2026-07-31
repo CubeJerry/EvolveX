@@ -43,11 +43,27 @@ def create_model(input_PDB_file_path, copy_PDB_file_to_output_dir, mutations_lis
     return
 
 
+def _sample_variance_or_zero(values):
+    """Return sample variance, treating a singleton observation as zero spread.
+
+    ``statistics.variance`` intentionally requires at least two observations.
+    A position restricted to one allowed amino acid has only one FoldX result,
+    so there is no observed spread to estimate and zero is the appropriate
+    neutral value for the low-variance hydrophobic filter below.
+    """
+    values = list(values)
+    if len(values) < 2:
+        return 0.0
+    return statistics.variance(values)
+
+
 def get_acceptable_positions_mut_names_map(all_mutations_summary_df, PDB_name):
     acceptable_mutations_map = defaultdict(list)
     for position, position_df in all_mutations_summary_df.groupby('position'):
-        binding_ddG_variance = statistics.variance(position_df.binding_ddG.values)
-        antibody_stability_ddG_variance = statistics.variance(position_df.antibody_stability_ddG.values)
+        binding_values = position_df.binding_ddG.values
+        stability_values = position_df.antibody_stability_ddG.values
+        binding_ddG_variance = _sample_variance_or_zero(binding_values)
+        antibody_stability_ddG_variance = _sample_variance_or_zero(stability_values)
         mean_binding_and_stability_variance = (binding_ddG_variance + antibody_stability_ddG_variance) / 2
         for mut_name, row in position_df.iterrows():
             mutant_residue = mut_name[-1]
