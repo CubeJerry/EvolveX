@@ -1,10 +1,9 @@
-# EvolveX for NOMINEE
+# EvolveX (Jerry's Version)
 
 <!-- Publication note: replace this comment with
 > **Used in:** [Paper title](DOI or publication URL) — authors, year.
 when the citation is available. -->
 
-**Structure-guided antibody and nanobody sequence optimisation with explicit control of stability and mutation burden.**
 
 This repository contains the modified [EvolveX](https://github.com/SwitchLab-VIB/EvolveX) implementation used in the optimisation stage of [NOMINEE](https://github.com/CubeJerry/dev). Starting from antibody–antigen complex structures and a defined set of mutable positions, EvolveX explores sequence variants using FoldX energy estimates.
 
@@ -28,14 +27,7 @@ The changes described here apply to the **genetic algorithm / Monte Carlo search
 
 ## Scoring and acceptance
 
-### Reference states and sign convention
-
-Two reference states have different roles:
-
-- **Current model:** the model being modified at a particular search step. Energy changes compare a proposal with its FoldX-generated wild-type counterpart for that step.
-- **Original sequence:** the antibody sequence in the input complex, before search initialisation. Mutation burden and cumulative stability drift are measured against this reference.
-
-For an energy-like score $G$, a proposed change is written as
+For an energy score $G$,
 
 ```math
 \Delta G = G_{\mathrm{proposed}} - G_{\mathrm{current}}.
@@ -62,7 +54,7 @@ The fork uses the following change in score for each proposal:
 | $\Delta G_{\mathrm{stab}}$ | Change in the FoldX stability energy of the antibody chain group |
 | $\Delta n_{\mathrm{mut}}$ | Change in the number of mutable positions that differ from the original sequence |
 
-The coefficients are fixed in the current implementation. The mutation-count coefficient converts a count into a contribution on the search-score scale; the combined objective is a heuristic score, not a measured thermodynamic free energy.
+The coefficients are fixed in the current implementation. 
 
 The mutation term uses a **count**, rather than an unscaled fraction:
 
@@ -167,7 +159,7 @@ The fork also adjusts how mutations are **proposed**, before they are evaluated.
 
 The removed weight is redistributed proportionally among the other amino acids. Proposals still respect the allowed amino acids at each position.
 
-This is a composition-control heuristic: it reduces further enrichment of the selected residue group without banning those residues. It is not an explicit prediction of aggregation, solubility, or experimental developability. Together with the state-dependent proposals and additional rejection rules, the search is an optimisation heuristic rather than an exact equilibrium sampler.
+This is a composition-control heuristic: it reduces further enrichment of the selected residue group without banning those residues. It is not an explicit prediction of aggregation, solubility, or experimental developability. 
 
 ## Outputs and interpretation
 
@@ -181,7 +173,6 @@ For the GA search, the main outputs are:
 
 The CSV distinguishes **proposed** score changes from **retained** changes. Columns prefixed with `proposed_` record the evaluated proposal even when it is rejected; the corresponding retained objective-delta columns are zero for rejected proposals. Mutation fraction and structural properties describe the retained state.
 
-These scores support candidate generation and comparison. They are computational estimates: improved objective values alone do not establish improved experimental affinity, stability, or developability. Downstream assessment and experimental results should be reported separately.
 
 ## Code and integration
 
@@ -192,7 +183,5 @@ For the integrated workflow, see [NOMINEE](https://github.com/CubeJerry/dev). Fo
 ## Attribution
 
 EvolveX was developed by **Gabriel Cia and Rob Van Der Kant at SwitchLab**. This repository is a modified fork of [SwitchLab-VIB/EvolveX](https://github.com/SwitchLab-VIB/EvolveX); the upstream project provides the underlying FoldX-based design framework.
-
-When reporting work that uses this implementation, distinguish the original EvolveX method from the modifications described here and identify the exact fork revision used. The associated NOMINEE publication citation can be added at the top of this README when available.
 
 Code is distributed under the [Apache License 2.0](LICENSE). FoldX is obtained separately under its own licensing terms.
