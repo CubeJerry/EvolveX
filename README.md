@@ -5,7 +5,7 @@
 when the citation is available. -->
 
 
-This repository contains the modified [EvolveX](https://github.com/SwitchLab-VIB/EvolveX) implementation used in the optimisation stage of [NOMINEE](https://github.com/CubeJerry/dev). Starting from nanobody–antigen complex structures and a defined set of mutable positions, EvolveX explores sequence variants using FoldX energy estimates.
+This repository contains the modified [EvolveX](https://github.com/SwitchLab-VIB/EvolveX) implementation used in the optimisation stage of [NOMINEE](https://github.com/CubeJerry/NOMINEE). Starting from nanobody–antigen complex structures and a defined set of mutable positions, EvolveX explores sequence variants using FoldX energy estimates.
 
 This fork extends the original binding-centred search with a combined objective: favour predicted binding improvements, reward improved nanobody stability, and discourage unnecessary divergence from the original sequence. Structural checks, mutation limits, and composition-dependent proposal weights provide additional constraints during the search.
 
@@ -178,7 +178,7 @@ The CSV distinguishes **proposed** score changes from **retained** changes. Colu
 
 The package requires **Python 3.9 or later** and an external FoldX installation. Python dependencies and the `evolvex` command-line entry point are declared in [setup.py](setup.py).
 
-For the integrated workflow, see [NOMINEE](https://github.com/CubeJerry/dev). For the original EvolveX usage documentation and examples, see the [upstream repository](https://github.com/SwitchLab-VIB/EvolveX). The upstream example configuration and example dataset files are not bundled in this fork.
+For the integrated workflow, see [NOMINEE](https://github.com/CubeJerry/NOMINEE). For the original EvolveX usage documentation and examples, see the [upstream repository](https://github.com/SwitchLab-VIB/EvolveX). The upstream example configuration and example dataset files are not bundled in this fork.
 
 ## Attribution
 
