@@ -37,9 +37,9 @@ Two reference states have different roles:
 
 For an energy-like score $G$, a proposed change is written as
 
-$$
+```math
 \Delta G = G_{\mathrm{proposed}} - G_{\mathrm{current}}.
-$$
+```
 
 Lower values are better: a negative binding change indicates improved predicted interaction energy, and a negative antibody stability change indicates improved predicted stability.
 
@@ -47,15 +47,14 @@ Lower values are better: a negative binding change indicates improved predicted 
 
 The fork uses the following change in score for each proposal:
 
-$$
-\Delta E_{\mathrm{rewarded}}
-=
+```math
+\Delta E_{\mathrm{rewarded}} =
 \Delta G_{\mathrm{bind,obj}}
 +
 0.25\,\Delta G_{\mathrm{stab}}
 +
 0.5\,\Delta n_{\mathrm{mut}}.
-$$
+```
 
 | Term | Meaning |
 |---|---|
@@ -67,12 +66,11 @@ The coefficients are fixed in the current implementation. The mutation-count coe
 
 The mutation term uses a **count**, rather than an unscaled fraction:
 
-$$
-\Delta n_{\mathrm{mut}}
-=
+```math
+\Delta n_{\mathrm{mut}} =
 N_{\mathrm{mutable}}
 \left(f_{\mathrm{proposed}}-f_{\mathrm{current}}\right),
-$$
+```
 
 where $f$ is the fraction of mutable positions differing from the original sequence. Introducing one additional difference contributes $+0.5$ to the objective; restoring one original residue contributes $-0.5$. Replacing one non-original residue with another leaves the count unchanged.
 
@@ -82,29 +80,27 @@ This lets stability improvements or a reduction in mutation burden offset a mode
 
 With the standard FoldX calculation, the binding objective is simply the binding-energy change. When the optional water-aware calculation is enabled, the two changes are averaged:
 
-$$
-\Delta G_{\mathrm{bind,obj}}
-=
+```math
+\Delta G_{\mathrm{bind,obj}} =
 \begin{cases}
 \Delta G_{\mathrm{bind}}, & \text{standard calculation}, \\[4pt]
 \dfrac{\Delta G_{\mathrm{bind}}+\Delta G_{\mathrm{bind,water}}}{2},
 & \text{water-aware calculation enabled}.
 \end{cases}
-$$
+```
 
 ### Metropolis acceptance
 
 After the hard checks described below, the combined score enters a Metropolis acceptance step:
 
-$$
-P_{\mathrm{Metropolis}}
-=
+```math
+P_{\mathrm{Metropolis}} =
 \begin{cases}
 1, & \Delta E_{\mathrm{rewarded}}\leq 0, \\[4pt]
 \exp\!\left(-\dfrac{\Delta E_{\mathrm{rewarded}}}{0.5919}\right),
 & \Delta E_{\mathrm{rewarded}}>0.
 \end{cases}
-$$
+```
 
 Favourable moves pass this step, while unfavourable moves can still be retained probabilistically. The scale factor $0.5919$ is inherited from the original implementation.
 
@@ -120,14 +116,14 @@ The GA search applies structural checks from its first search iteration. A propo
 - increases the antibody intraclash score by more than $3.0$ in a single step; or
 - exceeds the following antibody stability limit relative to the original input:
 
-$$
+```math
 G_{\mathrm{stab,proposed}}
 >
 \max\!\left(
 1.3\,G_{\mathrm{stab,original}},
 G_{\mathrm{stab,original}}+10.0
 \right).
-$$
+```
 
 The last check limits accumulated stability drift across many individually permissible steps. It uses the more permissive of the two bounds shown above. Intraclash is a FoldX score and should be distinguished from the energy terms.
 
@@ -135,15 +131,14 @@ The last check limits accumulated stability drift across many individually permi
 
 Mutation burden is defined over the **mutable positions tracked by the search**, not over the full antibody sequence:
 
-$$
-f
-=
+```math
+f =
 \frac{
 \text{mutable positions differing from the original sequence}
 }{
 N_{\mathrm{mutable}}
 }.
-$$
+```
 
 | Constraint | Behaviour |
 |---|---|
@@ -152,11 +147,10 @@ $$
 
 For divergence-increasing moves between the soft and hard caps, the probability of surviving the additional soft-cap check decreases linearly:
 
-$$
-P_{\mathrm{soft}}
-=
+```math
+P_{\mathrm{soft}} =
 1-\frac{f_{\mathrm{proposed}}-0.25}{0.50-0.25}.
-$$
+```
 
 This additional check applies only when $f_{\mathrm{proposed}}>f_{\mathrm{current}}$ and $f_{\mathrm{proposed}}>0.25$. Moves that preserve or reduce divergence are exempt from the soft-cap check, but remain subject to the hard checks and Metropolis decision. An increase to exactly 50% has zero soft-cap survival probability.
 
@@ -192,15 +186,6 @@ These scores support candidate generation and comparison. They are computational
 ## Code and integration
 
 The package requires **Python 3.9 or later** and an external FoldX installation. Python dependencies and the `evolvex` command-line entry point are declared in [setup.py](setup.py).
-
-| File | Role |
-|---|---|
-| [search_algorithms.py](src/evolvex/search_algorithms.py) | Combined objective, acceptance checks, proposal weights, Monte Carlo steps, and recombination |
-| [model_generation.py](src/evolvex/model_generation.py) | Initial model generation and mutation-selection helpers |
-| [mutate_interface.py](src/evolvex/mutate_interface.py) | Initial mutation screening and per-position summaries |
-| [foldx_commands.py](src/evolvex/foldx_commands.py) | FoldX execution and result parsing |
-| [main.py](src/evolvex/main.py) | Workflow orchestration and output locations |
-| [command_line_interface.py](src/evolvex/command_line_interface.py) | YAML configuration loading and validation |
 
 For the integrated workflow, see [NOMINEE](https://github.com/CubeJerry/dev). For the original EvolveX usage documentation and examples, see the [upstream repository](https://github.com/SwitchLab-VIB/EvolveX). The upstream example configuration and example dataset files are not bundled in this fork.
 
