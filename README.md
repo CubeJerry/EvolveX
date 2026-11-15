@@ -5,9 +5,9 @@
 when the citation is available. -->
 
 
-This repository contains the modified [EvolveX](https://github.com/SwitchLab-VIB/EvolveX) implementation used in the optimisation stage of [NOMINEE](https://github.com/CubeJerry/dev). Starting from antibody–antigen complex structures and a defined set of mutable positions, EvolveX explores sequence variants using FoldX energy estimates.
+This repository contains the modified [EvolveX](https://github.com/SwitchLab-VIB/EvolveX) implementation used in the optimisation stage of [NOMINEE](https://github.com/CubeJerry/dev). Starting from nanobody–antigen complex structures and a defined set of mutable positions, EvolveX explores sequence variants using FoldX energy estimates.
 
-This fork extends the original binding-centred search with a combined objective: favour predicted binding improvements, reward improved antibody stability, and discourage unnecessary divergence from the original sequence. Structural checks, mutation limits, and composition-dependent proposal weights provide additional constraints during the search.
+This fork extends the original binding-centred search with a combined objective: favour predicted binding improvements, reward improved nanobody stability, and discourage unnecessary divergence from the original sequence. Structural checks, mutation limits, and composition-dependent proposal weights provide additional constraints during the search.
 
 [Overview](#overview) · [Scoring and acceptance](#scoring-and-acceptance) · [Design constraints](#design-constraints) · [Outputs and interpretation](#outputs-and-interpretation) · [Code and integration](#code-and-integration) · [Attribution](#attribution)
 
@@ -19,8 +19,8 @@ The changes described here apply to the **genetic algorithm / Monte Carlo search
 
 | Component | Original EvolveX | This fork |
 |---|---|---|
-| Acceptance objective | Binding-energy changes | Combined binding, antibody stability, and mutation-count changes |
-| Structural checks | Hard stability and intraclash filters | Revised stepwise filters and a stability limit relative to the original antibody |
+| Acceptance objective | Binding-energy changes | Combined binding, nanobody stability, and mutation-count changes |
+| Structural checks | Hard stability and intraclash filters | Revised stepwise filters and a stability limit relative to the original nanobody |
 | Sequence divergence | No explicit mutation-burden term in acceptance | A mutation-count penalty, a soft cap, and a hard cap |
 | Mutation proposals | Fixed amino-acid proposal weights | Weights adjusted according to the current sequence composition |
 | Search records | Structural and energetic properties of retained models | Additional proposed and retained objective changes, plus mutation burden |
@@ -33,7 +33,7 @@ For an energy score $G$,
 \Delta G = G_{\mathrm{proposed}} - G_{\mathrm{current}}.
 ```
 
-Lower values are better: a negative binding change indicates improved predicted interaction energy, and a negative antibody stability change indicates improved predicted stability.
+Lower values are better: a negative binding change indicates improved predicted interaction energy, and a negative nanobody stability change indicates improved predicted stability.
 
 ### Combined objective
 
@@ -51,7 +51,7 @@ The fork uses the following change in score for each proposal:
 | Term | Meaning |
 |---|---|
 | $\Delta G_{\mathrm{bind,obj}}$ | Change in the binding objective, defined below |
-| $\Delta G_{\mathrm{stab}}$ | Change in the FoldX stability energy of the antibody chain group |
+| $\Delta G_{\mathrm{stab}}$ | Change in the FoldX stability energy of the nanobody chain group |
 | $\Delta n_{\mathrm{mut}}$ | Change in the number of mutable positions that differ from the original sequence |
 
 The coefficients are fixed in the current implementation. 
@@ -104,9 +104,9 @@ Favourable moves pass this step, while unfavourable moves can still be retained 
 
 The GA search applies structural checks from its first search iteration. A proposal is rejected if it:
 
-- worsens antibody stability by more than $3.0$ in a single step;
-- increases the antibody intraclash score by more than $3.0$ in a single step; or
-- exceeds the following antibody stability limit relative to the original input:
+- worsens nanobody stability by more than $3.0$ in a single step;
+- increases the nanobody intraclash score by more than $3.0$ in a single step; or
+- exceeds the following nanobody stability limit relative to the original input:
 
 ```math
 G_{\mathrm{stab,proposed}}
@@ -121,7 +121,7 @@ The last check limits accumulated stability drift across many individually permi
 
 ### Mutation burden
 
-Mutation burden is defined over the **mutable positions tracked by the search**, not over the full antibody sequence:
+Mutation burden is defined over the **mutable positions tracked by the search**, not over the full nanobody sequence:
 
 ```math
 f =
