@@ -137,6 +137,8 @@ N_{\mathrm{mutable}}
 | Soft cap: 25% | Above this fraction, an otherwise accepted move that further increases divergence faces an additional probabilistic rejection. |
 | Hard cap: 50% | Proposals above this fraction are rejected. |
 
+These mutation limits apply to proposals evaluated during the GA search; they are not enforced when generating the initial model population.
+
 For divergence-increasing moves between the soft and hard caps, the probability of surviving the additional soft-cap check decreases linearly:
 
 ```math
@@ -145,6 +147,12 @@ P_{\mathrm{soft}} =
 ```
 
 This additional check applies only when $f_{\mathrm{proposed}}>f_{\mathrm{current}}$ and $f_{\mathrm{proposed}}>0.25$. Moves that preserve or reduce divergence are exempt from the soft-cap check, but remain subject to the hard checks and Metropolis decision. An increase to exactly 50% has zero soft-cap survival probability.
+
+### Position-specific amino-acid restrictions
+
+The tab-separated input specified by `PositionsToExplore_file_path` uses `AA_Allowed` to restrict substitutions at each position. Set it to `AUTO` to screen candidate residues (with `MakeAla=Y`), a string such as `KRH` to allow K, R, or H, or a single one-letter code such as `K` to allow only K. Single-letter restrictions are supported.
+
+`MakeAla=Y` replaces the position with alanine during initial preparation; `MakeAla=N` retains the original residue at that stage. At least one position must have `MakeAla=Y`. With `MakeAla=N`, a single allowed amino acid limits subsequent mutation proposals but does not force a change in the initial model.
 
 ### Composition-dependent proposals
 
